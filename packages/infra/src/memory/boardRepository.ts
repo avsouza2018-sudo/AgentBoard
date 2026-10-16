@@ -16,6 +16,10 @@ export class InMemoryBoardRepository implements BoardRepository {
   async list(_tx: Tx): Promise<Board[]> {
     return [...this.boards.values()];
   }
+
+  async save(_tx: Tx, board: Board): Promise<void> {
+    this.boards.set(board.id, board);
+  }
 }
 
 export class InMemoryWorkflowRepository implements WorkflowRepository {

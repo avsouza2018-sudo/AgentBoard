@@ -20,7 +20,8 @@ export class ListTasks {
       if (!workflow) return err(new NotFoundError('workflow', input.boardId));
 
       const page = await this.deps.tasks.query(tx, { boardId: input.boardId, ...input.filter });
-      return ok({ items: page.items.map((t) => toTaskSummary(t, workflow)), cursor: page.cursor });
+      const now = this.deps.clock.now();
+      return ok({ items: page.items.map((t) => toTaskSummary(t, workflow, now)), cursor: page.cursor });
     });
   }
 }

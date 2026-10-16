@@ -76,7 +76,7 @@
     "rate_limited": 429,
     "method_not_allowed": 405
   },
-  "x-tool-count": 15,
+  "x-tool-count": 17,
   "paths": {
     "/api/tasks/{task_id}/comments": {
       "post": {
@@ -823,6 +823,156 @@
                   }
                 },
                 "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/boards/{board_id}/agents": {
+      "get": {
+        "operationId": "list_agents",
+        "summary": "The roster",
+        "description": "The board as a list of principals: who they are, who minted their credential, and which cards each is holding under a live lease at the moment of the read. Lease status is the server's answer, not a guess.",
+        "x-use-case": "listAgents",
+        "x-annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The read result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "register_agent",
+        "summary": "Register a principal",
+        "description": "Put a principal on the board and mint its credential. Only a board admin may call this — an agent cannot create its own members. The credential is returned once and never read back, so this is the only operation that hands one out.",
+        "x-use-case": "registerAgent",
+        "x-annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the write, including the events it produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "actor_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "human",
+                      "agent"
+                    ]
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "viewer",
+                      "member",
+                      "admin",
+                      "agent"
+                    ]
+                  },
+                  "scopes": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write",
+                        "transition",
+                        "comment"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "actor_id",
+                  "name",
+                  "type",
+                  "role",
+                  "scopes"
+                ],
                 "additionalProperties": false
               }
             }

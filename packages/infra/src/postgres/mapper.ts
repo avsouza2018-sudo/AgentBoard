@@ -7,6 +7,7 @@ import type {
   Lease,
   Membership,
   Priority,
+  Registration,
   Role,
   Scope,
   Task,
@@ -110,6 +111,13 @@ export interface ActorRow {
   scopes: string[];
 }
 
+export interface RegistrationRow extends ActorRow {
+  token: string;
+  created_by: string | null;
+  run_id: string | null;
+  registered_at: Date;
+}
+
 export function taskFromRow(
   row: TaskRow,
   comments: CommentRow[],
@@ -206,5 +214,14 @@ export function actorFromRow(row: ActorRow): Actor {
     type: row.type as Actor['type'],
     name: row.name,
     scopes: row.scopes as Scope[],
+  };
+}
+
+export function registrationFromRow(row: RegistrationRow): Registration {
+  return {
+    actor: actorFromRow({ id: row.id, type: row.type, name: row.name, scopes: row.scopes }),
+    registeredBy: row.created_by ? id<ActorId>(row.created_by) : null,
+    runId: row.run_id ? id<RunId>(row.run_id) : null,
+    at: row.registered_at,
   };
 }

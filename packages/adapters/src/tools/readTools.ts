@@ -120,4 +120,19 @@ export const READ_TOOLS: ToolDefinition[] = [
         },
       }),
   ),
+
+  defineTool(
+    {
+      name: 'list_agents',
+      title: 'The roster',
+      description:
+        'The board as a list of principals: who they are, who minted their credential, and which cards each is holding under a live lease at the moment of the read. Lease status is the server\'s answer, not a guess.',
+      kind: 'read',
+      annotations: READ,
+      route: { method: 'GET', path: '/api/boards/{board_id}/agents' },
+      useCase: 'listAgents',
+    },
+    z.object({ board_id: z.string().min(1) }),
+    (app, ctx, args) => app.listAgents.execute({ ...ctx, boardId: id<BoardId>(args.board_id) }),
+  ),
 ];

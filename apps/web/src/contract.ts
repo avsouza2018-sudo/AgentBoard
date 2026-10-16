@@ -24,9 +24,23 @@ export interface ApiError {
   retryable: boolean;
 }
 
+/**
+ * A lease as the server reports it. `status` is the domain's word — `none | held | expiring | expired` —
+ * not the page's. The same policy that refuses a `result` comment on an expired lease is what names
+ * `expiring` here, so the board and the page cannot disagree about the same card. A page that decided
+ * "this lease looks stale" would be a second definition of staleness, and the second definition is the
+ * one that drifts.
+ *
+ * `status` is null only when the shape came from a write response. A write returns the aggregate, and
+ * the aggregate carries a lease but not a status — a status is a fact about the moment a read happened,
+ * so only the read model can carry it. The page shows no word in that case rather than inventing one.
+ */
+export type LeaseStatus = 'none' | 'held' | 'expiring' | 'expired';
+
 export interface LeaseView {
   agentId: string;
   expiresAt: string;
+  status: LeaseStatus | null;
 }
 
 export interface TaskSummary {
@@ -129,6 +143,22 @@ export interface Identity {
   boards: Array<{ id: string; name: string; slug: string; role: string }>;
 }
 
+/**
+ * A principal as the roster reports it. `registeredBy` is the fact the audit trail cannot answer: the
+ * trail says which token moved a card, the registry says who minted that token. `held` is the lease the
+ * server still considered live at the moment it answered — the page does not decide that.
+ */
+export interface AgentView {
+  id: string;
+  type: string;
+  name: string;
+  role: string;
+  scopes: string[];
+  registeredBy: string | null;
+  held: TaskSummary[];
+  lastActivityAt: string | null;
+}
+
 export interface Page<T> {
   items: T[];
   cursor: string | null;
@@ -146,6 +176,7 @@ export const OPERATIONS = {
   listTasks: { method: 'GET', path: '/api/boards/{board_id}/tasks' },
   createTask: { method: 'POST', path: '/api/boards/{board_id}/tasks' },
   activity: { method: 'GET', path: '/api/boards/{board_id}/activity' },
+  agents: { method: 'GET', path: '/api/boards/{board_id}/agents' },
   task: { method: 'GET', path: '/api/tasks/{task_id}' },
   move: { method: 'POST', path: '/api/tasks/{task_id}/move' },
   claim: { method: 'POST', path: '/api/tasks/{task_id}/claim' },
@@ -164,6 +195,8 @@ export const FIELDS = {
   taskAggregate: ['id', 'boardId', 'key', 'title', 'description', 'statusId', 'priority', 'assigneeId', 'reporterId', 'labels', 'blockedBy', 'acceptanceCriteria', 'comments', 'lease', 'version', 'createdAt', 'updatedAt'],
   comment: ['id', 'authorId', 'kind', 'body', 'runId', 'createdAt'],
   activity: ['id', 'type', 'actorId', 'runId', 'at', 'payload'],
+  lease: ['agentId', 'expiresAt', 'status'],
+  agent: ['id', 'type', 'name', 'role', 'scopes', 'registeredBy', 'held', 'lastActivityAt'],
   error: ['code', 'message', 'details', 'retryable'],
   response: ['data'],
 } as const;

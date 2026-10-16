@@ -7,17 +7,18 @@
 import { buildApplication } from '@agentboard/application';
 import { id, type RunId } from '@agentboard/shared';
 import { buildToolRegistry, OutboxStream, startApiServer, type ApiRequest, type ToolContext } from '@agentboard/adapters';
-import { chooseWiring } from '../../composition.js';
+import { actorLookup, chooseWiring } from '../../composition.js';
 
 async function main(): Promise<void> {
   const wiring = await chooseWiring();
   const app = buildApplication(wiring.deps);
-  const registry = buildToolRegistry(app);
+  const registry = buildToolRegistry(app, { limiter: wiring.limiter, log: wiring.log, clock: wiring.deps.clock });
 
   const stream = new OutboxStream(wiring.outbox, { intervalMs: Number(process.env.STREAM_INTERVAL_MS ?? 250) });
 
-  const resolve = (request: ApiRequest): ToolContext | null =>
-    request.token ? { actorToken: request.token, runId: request.runId ? id<RunId>(request.runId) : null } : null;
+  const lookup = actorLookup(wiring.deps);
+  const resolve = async (request: ApiRequest): Promise<ToolContext | null> =>
+    request.token === null ? null : { actorToken: request.token, runId: request.runId ? id<RunId>(request.runId) : null, actorId: await lookup(request.token) };
 
   const port = Number(process.env.PORT ?? 3000);
   const api = startApiServer({ app, registry, stream, resolve }, port);

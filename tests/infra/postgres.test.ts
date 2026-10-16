@@ -250,6 +250,6 @@ pg('Postgres adapters', () => {
     expect(reapplied).toHaveLength(0);
 
     const rows = await h.pool.query('select file from schema_migrations order by file');
-    expect(rows.rows.map((r) => r.file)).toEqual(['001_initial.sql']);
+    expect(rows.rows.map((r) => r.file)).toEqual(['001_initial.sql', '002_agent_registry.sql']);
   });
 });

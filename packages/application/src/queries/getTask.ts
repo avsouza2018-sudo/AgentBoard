@@ -31,7 +31,7 @@ export class GetTask {
       const activity = await this.deps.activity.readForTask(tx, task.id, input.activityLimit ?? 20);
 
       return ok({
-        task: toTaskSummary(task, workflow),
+        task: toTaskSummary(task, workflow, this.deps.clock.now()),
         description: task.description,
         acceptanceCriteria: task.acceptanceCriteria,
         comments: task.comments.map(toCommentDto),

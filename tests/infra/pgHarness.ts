@@ -86,6 +86,20 @@ export async function seed(pool: Pool): Promise<void> {
       ]);
     }
 
+    // The port mints its own credential, so the harness cannot predict it. The fixture tokens are
+    // inserted directly here — this is the one place that writes a token rather than asking for one,
+    // and it is a test fixture, not a production path. The attribution is real: the agent's credential
+    // is the one the parity test expects a registry to be able to name.
+    for (const [token, actor, registeredBy] of [
+      [F.AGENT_TOKEN, F.AGENT_ACTOR, F.HUMAN],
+      [F.HUMAN_TOKEN, F.HUMAN_ACTOR, null],
+    ] as const) {
+      await client.query(
+        'insert into api_tokens (token, actor_id, created_by, run_id) values ($1, $2, $3, $4)',
+        [token, actor.id, registeredBy, null],
+      );
+    }
+
     await client.query('insert into boards (id, name, slug, workflow_id) values ($1, $2, $3, $4)', [
       F.BOARD,
       F.BOARD_NAME,
@@ -125,10 +139,6 @@ export async function seed(pool: Pool): Promise<void> {
   } finally {
     client.release();
   }
-
-  const actors = new PgActorStore(pool);
-  await actors.register(F.AGENT_ACTOR, F.AGENT_TOKEN);
-  await actors.register(F.HUMAN_ACTOR, F.HUMAN_TOKEN);
 }
 
 export async function pgHarness(runtime: PgRuntime) {
@@ -157,6 +167,7 @@ export async function pgHarness(runtime: PgRuntime) {
     keys,
     resolver: actors,
     directory: actors,
+    agents: actors,
     clock,
     ids,
   };

@@ -28,7 +28,7 @@ describe('the stdio transport', () => {
     const { client, transport } = await connect({ AGENTBOARD_TOKEN: AGENT_TOKEN, AGENTBOARD_RUN_ID: 'run-stdio' });
 
     const tools = await client.listTools();
-    expect(tools.tools).toHaveLength(15);
+    expect(tools.tools).toHaveLength(17);
 
     const who = await client.callTool({ name: 'who_am_i', arguments: {} });
     expect((who.structuredContent as { actor: { id: string } }).actor.id).toBe('agent-atlas');

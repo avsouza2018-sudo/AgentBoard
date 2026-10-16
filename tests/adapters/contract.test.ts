@@ -20,7 +20,7 @@ const CONTRACT_PATH = fileURLToPath(new URL('../../contracts/mcp-tools.json', im
 
 /** Minimal argument sets built from the contract, so the registry reaches the handler. */
 function sampleArgs(entry: ToolContractEntry): Record<string, unknown> {
-  const properties = (entry.inputSchema.properties ?? {}) as Record<string, { type?: string | string[]; enum?: unknown[] }>;
+  const properties = (entry.inputSchema.properties ?? {}) as Record<string, { type?: string | string[]; enum?: unknown[]; items?: { type?: string; enum?: unknown[] } }>;
   const required = (entry.inputSchema.required ?? []) as string[];
   const args: Record<string, unknown> = {};
 
@@ -28,8 +28,14 @@ function sampleArgs(entry: ToolContractEntry): Record<string, unknown> {
     const property = properties[key];
     if (!property) continue;
     if (property.enum?.length) args[key] = property.enum[0];
-    else if (property.type === 'array') args[key] = [];
-    else if (property.type === 'boolean') args[key] = true;
+    else if (property.type === 'array') {
+      // A sample element has to satisfy the item schema, not just the array: `scopes` is an array of
+      // enums with a minimum length, so an empty list would fail validation before the handler ran and
+      // the test would be checking the schema instead of the routing.
+      const item = property.items as { enum?: unknown[]; type?: string } | undefined;
+      const element = item?.enum?.length ? item.enum[0] : item?.type === 'number' ? 1 : 'x';
+      args[key] = [element];
+    } else if (property.type === 'boolean') args[key] = true;
     else if (property.type === 'number') args[key] = 1;
     else if (Array.isArray(property.type) && property.type.includes('null')) args[key] = null;
     else args[key] = 'x';

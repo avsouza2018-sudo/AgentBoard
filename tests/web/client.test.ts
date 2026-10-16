@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { AGENT_TOKEN, BOARD, STATES } from '../harness.js';
+import { AGENT_TOKEN, BOARD, HUMAN, STATES } from '../harness.js';
 import { FIELDS, OPERATIONS } from '../../apps/web/src/contract.js';
 import { parseFrame, type Frame } from '../../apps/web/src/live.js';
 import { connect } from '../../apps/web/src/live.js';
@@ -44,7 +44,7 @@ describe('the client against the contract it claims to consume', () => {
       checked.push(`${operation.method} ${operation.path}`);
     }
 
-    expect(checked.length).toBe(10);
+    expect(checked.length).toBe(11);
   });
 
   it('the live feed path is the one the adapter actually serves', async () => {
@@ -77,6 +77,19 @@ describe('the client against the contract it claims to consume', () => {
 
     const activity = dataOf(await s.client.activity(BOARD));
     expect(Object.keys(activity[0] ?? {}).sort()).toEqual([...FIELDS.activity].sort());
+
+    // The roster is a read model, so the mirror has to be true for it too — including the fact the
+    // audit trail cannot answer, which is who minted the credential.
+    const roster = dataOf(await s.client.agents(BOARD));
+    expect(Object.keys(roster[0] ?? {}).sort()).toEqual([...FIELDS.agent].sort());
+    expect(roster[0]?.registeredBy).toBe(HUMAN); // agents first, and atlas's credential was minted by ada
+    expect(roster.find((a) => a.registeredBy === null)?.type).toBe('human'); // the seed row: the one registration nobody performed
+
+    // A write returns the aggregate, whose lease carries no status; the read model's lease does. The
+    // mirror lists both, and the live JSON is what proves the lists.
+    dataOf(await s.client.claim(created.id));
+    const leased = (dataOf(await s.client.listTasks(BOARD)).items.find((t) => t.id === created.id))?.lease;
+    expect(Object.keys(leased ?? {}).sort()).toEqual([...FIELDS.lease].sort());
 
     const refusal = await s.client.move({ task_id: created.id, to_state_id: STATES.done, reason: 'no transition' });
     expect(refusal.ok).toBe(false);

@@ -44,13 +44,15 @@ export async function harness() {
   const resolver = new InMemoryActorStore();
   const uow = new MemoryUnitOfWork();
 
-  const deps: Deps = { uow, tasks, boards, workflows, activity, publisher, keys, resolver, directory: resolver, clock, ids };
+  const deps: Deps = { uow, tasks, boards, workflows, activity, publisher, keys, resolver, directory: resolver, agents: resolver, clock, ids };
 
   boards.add(makeBoard(BOARD, BOARD_SLUG, BOARD_NAME, MEMBERSHIPS));
   workflows.add(makeWorkflow(BOARD, 'Default', STATE_ROWS, TRANSITION_ROWS));
 
-  const agentToken = await resolver.register(AGENT_ACTOR);
-  const humanToken = await resolver.register(HUMAN_ACTOR);
+  // The seed row is the only registration nobody performed; the agent's credential is attributed to
+  // the admin who minted it, which is what the panel shows.
+  const humanToken = await uow.run((tx) => resolver.register(tx, HUMAN_ACTOR, { actorId: null, runId: null }));
+  const agentToken = await uow.run((tx) => resolver.register(tx, AGENT_ACTOR, { actorId: HUMAN, runId: null }));
 
   const app = buildApplication(deps);
 

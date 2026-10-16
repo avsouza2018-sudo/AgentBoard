@@ -136,8 +136,13 @@ export class CycleError extends AppError {
   }
 }
 
+/**
+ * The only code in the taxonomy that carries a time, and the field is named `retryAfter` because that
+ * is the name the HTTP renderer reads to build the `retry-after` header. One name, in one taxonomy:
+ * a limiter that wrote `retryAfterSeconds` would produce a refusal the transport could not render.
+ */
 export class RateLimitedError extends AppError {
   constructor(retryAfterSeconds: number) {
-    super('rate_limited', `rate limited, retry in ${retryAfterSeconds}s`, { retryAfterSeconds }, true);
+    super('rate_limited', `rate limited, retry in ${retryAfterSeconds}s`, { retryAfter: retryAfterSeconds }, true);
   }
 }

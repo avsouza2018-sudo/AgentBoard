@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { ContextResolver, ToolContext } from '../toolContext.js';
+import { withTransport, type ContextResolver, type ToolContext } from '../toolContext.js';
 import type { ToolRegistry } from '../toolRegistry.js';
 import { createMcpServer } from './protocol.js';
 
@@ -18,7 +18,7 @@ import { createMcpServer } from './protocol.js';
 export interface HttpMcpOptions {
   registry: ToolRegistry;
   /** Turns a header into an identity. The registry turns an identity into an actor. */
-  authenticate: (token: string | null) => ToolContext | null;
+  authenticate: (token: string | null) => ToolContext | null | Promise<ToolContext | null>;
   health?: (req: IncomingMessage, res: ServerResponse) => void;
 }
 
@@ -37,7 +37,7 @@ export async function handleMcpRequest(req: IncomingMessage, res: ServerResponse
     return;
   }
 
-  const ctx = opts.authenticate(bearerToken(req));
+  const ctx = withTransport(await opts.authenticate(bearerToken(req)), 'mcp-http');
   const resolver: ContextResolver = () => ctx;
   const server = createMcpServer(opts.registry, resolver);
 

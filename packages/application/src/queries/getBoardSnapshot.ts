@@ -49,6 +49,7 @@ export class GetBoardSnapshot {
       if (!workflow) return err(new NotFoundError('workflow', input.boardId));
 
       const page = await this.deps.tasks.query(tx, { boardId: board.id, limit: 200 });
+      const now = this.deps.clock.now();
 
       const columns: ColumnSnapshot[] = workflow.orderedStates().map((state) => {
         const tasks = page.items.filter((t) => t.statusId === state.id);
@@ -59,7 +60,7 @@ export class GetBoardSnapshot {
           isHumanGate: state.isHumanGate,
           wipLimit: state.wipLimit,
           count: tasks.length,
-          tasks: tasks.map((t) => toTaskSummary(t, workflow)),
+          tasks: tasks.map((t) => toTaskSummary(t, workflow, now)),
         };
       });
 

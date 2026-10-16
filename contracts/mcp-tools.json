@@ -343,6 +343,37 @@
     }
   },
   {
+    "name": "list_agents",
+    "title": "The roster",
+    "description": "The board as a list of principals: who they are, who minted their credential, and which cards each is holding under a live lease at the moment of the read. Lease status is the server's answer, not a guess.",
+    "kind": "read",
+    "route": {
+      "method": "GET",
+      "path": "/api/boards/{board_id}/agents"
+    },
+    "useCase": "listAgents",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "board_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "board_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "list_tasks",
     "title": "List tasks",
     "description": "Cards on a board, filtered by state, assignee, label, blocked-only or text, one page at a time.",
@@ -444,6 +475,79 @@
         "task_id",
         "to_state_id",
         "reason"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "register_agent",
+    "title": "Register a principal",
+    "description": "Put a principal on the board and mint its credential. Only a board admin may call this — an agent cannot create its own members. The credential is returned once and never read back, so this is the only operation that hands one out.",
+    "kind": "write",
+    "route": {
+      "method": "POST",
+      "path": "/api/boards/{board_id}/agents"
+    },
+    "useCase": "registerAgent",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "board_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "human",
+            "agent"
+          ]
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "viewer",
+            "member",
+            "admin",
+            "agent"
+          ]
+        },
+        "scopes": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write",
+              "transition",
+              "comment"
+            ]
+          }
+        }
+      },
+      "required": [
+        "board_id",
+        "actor_id",
+        "name",
+        "type",
+        "role",
+        "scopes"
       ],
       "additionalProperties": false
     }

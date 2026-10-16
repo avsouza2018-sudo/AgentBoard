@@ -254,4 +254,35 @@ export const WRITE_TOOLS: ToolDefinition[] = [
         note: args.note,
       }),
   ),
+
+  defineTool(
+    {
+      name: 'register_agent',
+      title: 'Register a principal',
+      description:
+        'Put a principal on the board and mint its credential. Only a board admin may call this — an agent cannot create its own members. The credential is returned once and never read back, so this is the only operation that hands one out.',
+      kind: 'write',
+      annotations: WRITE,
+      route: { method: 'POST', path: '/api/boards/{board_id}/agents' },
+      useCase: 'registerAgent',
+    },
+    z.object({
+      board_id: z.string().min(1),
+      actor_id: z.string().min(1),
+      name: z.string().min(1),
+      type: z.enum(['human', 'agent']),
+      role: z.enum(['viewer', 'member', 'admin', 'agent']),
+      scopes: z.array(z.enum(['read', 'write', 'transition', 'comment'])).min(1),
+    }),
+    (app, ctx, args) =>
+      app.registerAgent.execute({
+        ...ctx,
+        boardId: id<BoardId>(args.board_id),
+        actorId: id<ActorId>(args.actor_id),
+        name: args.name,
+        type: args.type,
+        role: args.role,
+        scopes: args.scopes,
+      }),
+  ),
 ];

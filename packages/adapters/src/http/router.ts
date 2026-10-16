@@ -1,7 +1,7 @@
 import { err, MethodNotAllowedError, NotFoundError, PermissionError, ValidationError } from '@agentboard/shared';
 import { renderHttp, type HttpResponse } from '../errorMapping.js';
 import { outcomeOf } from '../toolOutcome.js';
-import type { ToolContext } from '../toolContext.js';
+import { withTransport, type ToolContext } from '../toolContext.js';
 import type { ToolRegistry } from '../toolRegistry.js';
 import { argsFromRequest, coerceQuery, matchRoute, type MatchedRoute, type RouteEntry } from './routes.js';
 
@@ -24,7 +24,7 @@ export interface ApiDeps {
   readonly registry: ToolRegistry;
   readonly routes: readonly RouteEntry[];
   /** Turns a token into an identity. Same `ActorResolver` behind it as every tool. */
-  readonly resolve: (request: ApiRequest) => ToolContext | null;
+  readonly resolve: (request: ApiRequest) => ToolContext | null | Promise<ToolContext | null>;
 }
 
 /**
@@ -34,7 +34,7 @@ export interface ApiDeps {
  */
 export async function handleApiRequest(request: ApiRequest, deps: ApiDeps): Promise<HttpResponse> {
   // Identity first: an unauthenticated caller is not told which routes exist.
-  const ctx = deps.resolve(request);
+  const ctx = withTransport(await deps.resolve(request), 'http');
   if (!ctx) {
     return renderHttp(outcomeOf(err(new PermissionError('a bearer token is required', { path: request.path }))));
   }

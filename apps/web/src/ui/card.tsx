@@ -10,7 +10,12 @@ export function CardItem({ card, onOpen }: { card: CardView; onOpen: (taskId: st
 
       {card.lease ? (
         <p className="lease">
+          {/* The word is the server's. This component compares nothing against a clock: the read model
+             already said whether the lease is held, expiring or expired, and copying that word is the
+             whole job here. When `status` is null the shape came from a write response, which carries a
+             lease but no status — so the card shows the fact without inventing a word. */}
           held by <strong>{card.lease.agentId}</strong> until {formatTime(card.lease.expiresAt)}
+          {card.lease.status ? <span className={`status ${card.lease.status}`}>{card.lease.status}</span> : null}
         </p>
       ) : null}
 

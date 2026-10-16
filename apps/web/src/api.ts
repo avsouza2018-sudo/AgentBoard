@@ -1,4 +1,4 @@
-import { fill, OPERATIONS, type ActivityDto, type ApiError, type BoardSnapshot, type Identity, type Outcome, type Page, type TaskAggregate, type TaskDetail, type TaskSummary } from './contract.js';
+import { fill, OPERATIONS, type ActivityDto, type AgentView, type ApiError, type BoardSnapshot, type Identity, type Outcome, type Page, type TaskAggregate, type TaskDetail, type TaskSummary } from './contract.js';
 
 export interface ClientOptions {
   readonly baseUrl: string;
@@ -43,6 +43,11 @@ export class ApiClient {
 
   activity(boardId: string, filter: Record<string, string> = {}): Promise<Outcome<ActivityDto[]>> {
     return this.call<ActivityDto[]>('activity', { board_id: boardId }, filter);
+  }
+
+  /** The roster, read as the server answered it — including who minted each credential. */
+  agents(boardId: string): Promise<Outcome<AgentView[]>> {
+    return this.call<AgentView[]>('agents', { board_id: boardId });
   }
 
   task(taskId: string): Promise<Outcome<TaskDetail>> {

@@ -53,10 +53,11 @@ body {
 
 .shell {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   grid-template-columns: 1fr minmax(280px, 340px);
   grid-template-areas:
     'header header'
+    'fleet fleet'
     'board panel';
   min-height: 100vh;
 }
@@ -104,6 +105,105 @@ body {
 
 .live.on::before {
   color: var(--machine);
+}
+
+/* The roster is a list of principals, not a gallery. Colour follows the role the server reported:
+   an agent is drawn in the machine colour, a gate role in the gate colour. Nothing here says how a
+   member "feels"; it says who may act. */
+.fleet {
+  grid-area: fleet;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.member {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--graphite);
+  padding: 10px 12px;
+  min-width: 220px;
+}
+
+.member.agent {
+  border-left-color: var(--machine);
+}
+
+.member.admin {
+  border-left-color: var(--gate);
+}
+
+.member h2 {
+  margin: 0;
+  font-family: 'BigShoulders', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.member .meta {
+  margin: 2px 0 8px;
+  font-size: 12px;
+  color: var(--graphite);
+  display: flex;
+  gap: 10px;
+}
+
+.member .role {
+  color: var(--paper);
+}
+
+.member ul.held {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.member .none {
+  color: var(--graphite);
+}
+
+.member .held button {
+  all: unset;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  cursor: pointer;
+}
+
+.member .held button:focus-visible {
+  outline: 2px solid var(--machine);
+  outline-offset: 2px;
+}
+
+.member .key {
+  color: var(--paper);
+}
+
+/* The word is the server's. These colours name the state the read model reported; they do not decide
+   it, and the page has no clock of its own. */
+.lease-status,
+.member .held .lease-status {
+  color: var(--graphite);
+}
+
+.lease-status.held,
+.member .held .lease-status.held {
+  color: var(--machine);
+}
+
+.lease-status.expiring,
+.member .held .lease-status.expiring {
+  color: var(--gate);
+}
+
+.lease-status.expired,
+.member .held .lease-status.expired {
+  color: var(--refusal);
 }
 
 .board {

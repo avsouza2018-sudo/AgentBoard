@@ -56,7 +56,7 @@ describe('the HTTP transport', () => {
     const overInMemory = await (await inMemorySession(s.registry, { actorToken: AGENT_TOKEN, runId: id<RunId>('run-http') })).client.listTools();
 
     expect(overHttp.tools).toEqual(overInMemory.tools);
-    expect(overHttp.tools).toHaveLength(15);
+    expect(overHttp.tools).toHaveLength(17);
 
     s.server.close();
   });

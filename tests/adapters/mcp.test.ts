@@ -34,7 +34,7 @@ describe('the MCP surface', () => {
     const s = await session({ actorToken: AGENT_TOKEN, runId: null });
     const listed = await s.client.listTools();
 
-    expect(listed.tools).toHaveLength(15);
+    expect(listed.tools).toHaveLength(17);
     for (const tool of listed.tools) {
       expect(tool.description).toBeTruthy();
       expect(tool.inputSchema.type).toBe('object');
@@ -44,7 +44,7 @@ describe('the MCP surface', () => {
     }
 
     const read = listed.tools.filter((t) => t.annotations?.readOnlyHint);
-    expect(read.length).toBe(5);
+    expect(read.length).toBe(6);
 
     await s.client.close();
     await s.server.close();

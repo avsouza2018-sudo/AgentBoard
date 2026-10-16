@@ -1,6 +1,7 @@
 import type {
   ActivityRepository,
   ActorDirectory,
+  ActorRegistry,
   ActorResolver,
   BoardRepository,
   Clock,
@@ -23,6 +24,9 @@ export interface Deps {
   publisher: EventPublisher;
   resolver: ActorResolver;
   directory: ActorDirectory;
+  /** The roster of principals. A port, so the command that grants membership does not know what a
+   * token looks like or how it is stored. */
+  agents: ActorRegistry;
   clock: Clock;
   ids: IdGenerator;
 }

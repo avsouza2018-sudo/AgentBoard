@@ -42,12 +42,14 @@ describe('use cases against in-memory ports', () => {
     const task = unwrap(await h.app.createTask.execute({ ...h.ctx(h.agentToken), boardId: BOARD, title: 'one owner only' }));
     await h.app.claimTask.execute({ ...h.ctx(h.agentToken), taskId: task.id });
 
-    const vegaToken = await h.resolver.register({
-      id: SECOND_AGENT,
-      type: 'agent',
-      name: 'vega',
-      scopes: ['read', 'write', 'transition', 'comment'],
-    });
+    const vegaToken = await h.deps.uow.run((tx) =>
+      h.resolver.register(tx, {
+        id: SECOND_AGENT,
+        type: 'agent',
+        name: 'vega',
+        scopes: ['read', 'write', 'transition', 'comment'],
+      }, { actorId: HUMAN, runId: null }),
+    );
 
     const conflict = await h.app.claimTask.execute({ ...h.ctx(vegaToken), taskId: task.id });
     expect(conflict.ok).toBe(false);
