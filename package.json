@@ -1,0 +1,32 @@
+{
+  "name": "agentboard",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
+    "dep-check": "dependency-cruiser --config .dependency-cruiser.cjs --ts-config tsconfig.json --output-type err packages apps",
+    "contract": "tsx scripts/contract.ts",
+    "mcp": "tsx apps/mcp-server/src/main.ts",
+    "api": "tsx apps/api-server/src/main.ts",
+    "web": "pnpm --filter @agentboard/web dev"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "dependency-cruiser": "^16.4.0",
+    "testcontainers": "^10.28.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8",
+    "zod": "^4.6.7"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@agentboard/infra",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@agentboard/domain": "workspace:*",
+    "@agentboard/shared": "workspace:*"
+  }
+}

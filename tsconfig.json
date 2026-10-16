@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@agentboard/shared": ["packages/shared/src/index.ts"],
+      "@agentboard/domain": ["packages/domain/src/index.ts"],
+      "@agentboard/application": ["packages/application/src/index.ts"],
+      "@agentboard/infra": ["packages/infra/src/index.ts"],
+      "@agentboard/adapters": ["packages/adapters/src/index.ts"]
+    }
+  },
+  "include": ["packages/**/*.ts", "apps/**/*.ts", "tests/**/*.ts"]
+}

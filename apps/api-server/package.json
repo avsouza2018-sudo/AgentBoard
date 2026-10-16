@@ -1,0 +1,16 @@
+{
+  "name": "@agentboard/api-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@agentboard/adapters": "workspace:*",
+    "@agentboard/application": "workspace:*",
+    "@agentboard/domain": "workspace:*",
+    "@agentboard/infra": "workspace:*",
+    "@agentboard/shared": "workspace:*"
+  }
+}

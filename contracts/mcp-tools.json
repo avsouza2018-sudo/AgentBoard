@@ -1,0 +1,641 @@
+[
+  {
+    "name": "add_comment",
+    "title": "Add comment",
+    "description": "Write a comment as the caller. A result comment requires holding the lease; the comment records the run that produced it.",
+    "kind": "write",
+    "route": {
+      "method": "POST",
+      "path": "/api/tasks/{task_id}/comments"
+    },
+    "useCase": "addComment",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "note",
+            "result",
+            "question",
+            "handoff",
+            "escalation"
+          ]
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id",
+        "kind",
+        "body"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "assign_task",
+    "title": "Assign task",
+    "description": "Point a card at an actor. The assignee must be a member of the board.",
+    "kind": "write",
+    "route": {
+      "method": "POST",
+      "path": "/api/tasks/{task_id}/assign"
+    },
+    "useCase": "assignTask",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assignee_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "task_id",
+        "assignee_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "claim_task",
+    "title": "Claim task",
+    "description": "Take the lease on a card. Refuses if another agent still holds it. auto_start takes the guarded transition into an in_progress state when one exists.",
+    "kind": "write",
+    "route": {
+      "method": "POST",
+      "path": "/api/tasks/{task_id}/claim"
+    },
+    "useCase": "claimTask",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "auto_start": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "create_task",
+    "title": "Create task",
+    "description": "Create a card on a board. It lands on the workflow start state and the key is allocated from the board sequence — keys are never reused.",
+    "kind": "write",
+    "route": {
+      "method": "POST",
+      "path": "/api/boards/{board_id}/tasks"
+    },
+    "useCase": "createTask",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "board_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "lowest",
+            "low",
+            "medium",
+            "high",
+            "highest"
+          ]
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blocked_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "board_id",
+        "title"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "escalate_task",
+    "title": "Escalate to a human",
+    "description": "The agent-to-human handoff: an escalation comment plus a human assignee, in one write. The target must be a human actor.",
+    "kind": "write",
+    "route": {
+      "method": "POST",
+      "path": "/api/tasks/{task_id}/escalate"
+    },
+    "useCase": "escalate",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "human_actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id",
+        "human_actor_id",
+        "note"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_activity",
+    "title": "Audit trail",
+    "description": "Append-only history for a task, or for a whole board. It is the record of who moved what and why.",
+    "kind": "read",
+    "route": {
+      "method": "GET",
+      "path": "/api/boards/{board_id}/activity"
+    },
+    "useCase": "getActivity",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "board_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "required": [
+        "board_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_board_snapshot",
+    "title": "Board snapshot",
+    "description": "Columns with counts and cards, plus the workflow graph: which transitions exist, which states are human gates, and where the WIP limits are. An agent decides what it is allowed to do from this.",
+    "kind": "read",
+    "route": {
+      "method": "GET",
+      "path": "/api/boards/{board_id}"
+    },
+    "useCase": "getBoardSnapshot",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "board_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "board_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_task",
+    "title": "Task detail",
+    "description": "One card: fields, acceptance criteria, comments, and recent activity. Comments carry the run that produced them.",
+    "kind": "read",
+    "route": {
+      "method": "GET",
+      "path": "/api/tasks/{task_id}"
+    },
+    "useCase": "getTask",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "activity_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "list_tasks",
+    "title": "List tasks",
+    "description": "Cards on a board, filtered by state, assignee, label, blocked-only or text, one page at a time.",
+    "kind": "read",
+    "route": {
+      "method": "GET",
+      "path": "/api/boards/{board_id}/tasks"
+    },
+    "useCase": "listTasks",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "board_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assignee_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "only_blocked": {
+          "type": "boolean"
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "board_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "move_task",
+    "title": "Move card",
+    "description": "Move a card along the workflow graph. Refuses: a transition that does not exist, a human-gate state for an agent, a full state, open blockers, and missing required fields. reason is required and lands in the audit trail; force_reason overrides the blocker guard and is recorded as an override.",
+    "kind": "write",
+    "route": {
+      "method": "POST",
+      "path": "/api/tasks/{task_id}/move"
+    },
+    "useCase": "moveTask",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to_state_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "force_reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id",
+        "to_state_id",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "release_task",
+    "title": "Release task",
+    "description": "Drop the lease. Allowed for the holder, or for a human clearing a stale lease.",
+    "kind": "write",
+    "route": {
+      "method": "POST",
+      "path": "/api/tasks/{task_id}/release"
+    },
+    "useCase": "releaseTask",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unassign": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "renew_lease",
+    "title": "Renew lease",
+    "description": "Heartbeat for a long-running agent. Only the holder can renew; an expired lease is not renewed, it is reclaimed by whoever claims the task next.",
+    "kind": "write",
+    "route": {
+      "method": "POST",
+      "path": "/api/tasks/{task_id}/lease"
+    },
+    "useCase": "renewLease",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "set_blocked_by",
+    "title": "Set blockers",
+    "description": "Replace the blocker list. Refuses a dependency cycle before writing anything.",
+    "kind": "write",
+    "route": {
+      "method": "POST",
+      "path": "/api/tasks/{task_id}/blockers"
+    },
+    "useCase": "setBlockedBy",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "task_id",
+        "blockers"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "update_task",
+    "title": "Update task",
+    "description": "Change fields only — never the state. Moving a card is move_task, because a move is a guarded transition and an edit is not.",
+    "kind": "write",
+    "route": {
+      "method": "POST",
+      "path": "/api/tasks/{task_id}"
+    },
+    "useCase": "updateTask",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "lowest",
+            "low",
+            "medium",
+            "high",
+            "highest"
+          ]
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "who_am_i",
+    "title": "Who am I",
+    "description": "Resolve the token to an actor and show the boards they can see plus their role on each. Start here.",
+    "kind": "read",
+    "route": {
+      "method": "GET",
+      "path": "/api/me"
+    },
+    "useCase": "whoAmI",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  }
+]

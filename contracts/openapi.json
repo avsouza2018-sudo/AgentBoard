@@ -1,0 +1,1130 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AgentBoard HTTP API",
+    "version": "0.5.0",
+    "description": "The same tool surface an agent uses, served over HTTP. Routes are generated from the tool registry, so this document and the MCP tools/list cannot disagree."
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "A per-agent token, resolved by the same ActorResolver the tools use."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "details",
+          "retryable"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "blocked",
+              "concurrency",
+              "conflict",
+              "cycle",
+              "human_gate",
+              "lease_expired",
+              "lease_required",
+              "method_not_allowed",
+              "not_found",
+              "permission",
+              "rate_limited",
+              "transition_not_allowed",
+              "validation",
+              "wip_limit"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object"
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "x-error-codes": {
+    "validation": 400,
+    "not_found": 404,
+    "permission": 403,
+    "transition_not_allowed": 409,
+    "wip_limit": 409,
+    "blocked": 409,
+    "human_gate": 403,
+    "lease_required": 403,
+    "lease_expired": 409,
+    "concurrency": 409,
+    "conflict": 409,
+    "cycle": 409,
+    "rate_limited": 429,
+    "method_not_allowed": 405
+  },
+  "x-tool-count": 15,
+  "paths": {
+    "/api/tasks/{task_id}/comments": {
+      "post": {
+        "operationId": "add_comment",
+        "summary": "Add comment",
+        "description": "Write a comment as the caller. A result comment requires holding the lease; the comment records the run that produced it.",
+        "x-use-case": "addComment",
+        "x-annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the write, including the events it produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "note",
+                      "result",
+                      "question",
+                      "handoff",
+                      "escalation"
+                    ]
+                  },
+                  "body": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "body"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{task_id}/assign": {
+      "post": {
+        "operationId": "assign_task",
+        "summary": "Assign task",
+        "description": "Point a card at an actor. The assignee must be a member of the board.",
+        "x-use-case": "assignTask",
+        "x-annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the write, including the events it produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assignee_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "assignee_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{task_id}/claim": {
+      "post": {
+        "operationId": "claim_task",
+        "summary": "Claim task",
+        "description": "Take the lease on a card. Refuses if another agent still holds it. auto_start takes the guarded transition into an in_progress state when one exists.",
+        "x-use-case": "claimTask",
+        "x-annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the write, including the events it produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "auto_start": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/boards/{board_id}/tasks": {
+      "post": {
+        "operationId": "create_task",
+        "summary": "Create task",
+        "description": "Create a card on a board. It lands on the workflow start state and the key is allocated from the board sequence — keys are never reused.",
+        "x-use-case": "createTask",
+        "x-annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the write, including the events it produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "lowest",
+                      "low",
+                      "medium",
+                      "high",
+                      "highest"
+                    ]
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "acceptance_criteria": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "blocked_by": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "list_tasks",
+        "summary": "List tasks",
+        "description": "Cards on a board, filtered by state, assignee, label, blocked-only or text, one page at a time.",
+        "x-use-case": "listTasks",
+        "x-annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The read result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "status_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "assignee_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "label",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "only_blocked",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      }
+    },
+    "/api/tasks/{task_id}/escalate": {
+      "post": {
+        "operationId": "escalate_task",
+        "summary": "Escalate to a human",
+        "description": "The agent-to-human handoff: an escalation comment plus a human assignee, in one write. The target must be a human actor.",
+        "x-use-case": "escalate",
+        "x-annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the write, including the events it produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "human_actor_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "note": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "human_actor_id",
+                  "note"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/boards/{board_id}/activity": {
+      "get": {
+        "operationId": "get_activity",
+        "summary": "Audit trail",
+        "description": "Append-only history for a task, or for a whole board. It is the record of who moved what and why.",
+        "x-use-case": "getActivity",
+        "x-annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The read result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        ]
+      }
+    },
+    "/api/boards/{board_id}": {
+      "get": {
+        "operationId": "get_board_snapshot",
+        "summary": "Board snapshot",
+        "description": "Columns with counts and cards, plus the workflow graph: which transitions exist, which states are human gates, and where the WIP limits are. An agent decides what it is allowed to do from this.",
+        "x-use-case": "getBoardSnapshot",
+        "x-annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The read result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/tasks/{task_id}": {
+      "get": {
+        "operationId": "get_task",
+        "summary": "Task detail",
+        "description": "One card: fields, acceptance criteria, comments, and recent activity. Comments carry the run that produced them.",
+        "x-use-case": "getTask",
+        "x-annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The read result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "activity_limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "update_task",
+        "summary": "Update task",
+        "description": "Change fields only — never the state. Moving a card is move_task, because a move is a guarded transition and an edit is not.",
+        "x-use-case": "updateTask",
+        "x-annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the write, including the events it produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "lowest",
+                      "low",
+                      "medium",
+                      "high",
+                      "highest"
+                    ]
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "acceptance_criteria": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{task_id}/move": {
+      "post": {
+        "operationId": "move_task",
+        "summary": "Move card",
+        "description": "Move a card along the workflow graph. Refuses: a transition that does not exist, a human-gate state for an agent, a full state, open blockers, and missing required fields. reason is required and lands in the audit trail; force_reason overrides the blocker guard and is recorded as an override.",
+        "x-use-case": "moveTask",
+        "x-annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the write, including the events it produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "to_state_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "force_reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "to_state_id",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{task_id}/release": {
+      "post": {
+        "operationId": "release_task",
+        "summary": "Release task",
+        "description": "Drop the lease. Allowed for the holder, or for a human clearing a stale lease.",
+        "x-use-case": "releaseTask",
+        "x-annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the write, including the events it produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unassign": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{task_id}/lease": {
+      "post": {
+        "operationId": "renew_lease",
+        "summary": "Renew lease",
+        "description": "Heartbeat for a long-running agent. Only the holder can renew; an expired lease is not renewed, it is reclaimed by whoever claims the task next.",
+        "x-use-case": "renewLease",
+        "x-annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the write, including the events it produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{task_id}/blockers": {
+      "post": {
+        "operationId": "set_blocked_by",
+        "summary": "Set blockers",
+        "description": "Replace the blocker list. Refuses a dependency cycle before writing anything.",
+        "x-use-case": "setBlockedBy",
+        "x-annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the write, including the events it produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "blockers": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "blockers"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "operationId": "who_am_i",
+        "summary": "Who am I",
+        "description": "Resolve the token to an actor and show the boards they can see plus their role on each. Start here.",
+        "x-use-case": "whoAmI",
+        "x-annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "responses": {
+          "200": {
+            "description": "The read result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal. The status comes from the same table the MCP adapter renders through.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    }
+  }
+}
