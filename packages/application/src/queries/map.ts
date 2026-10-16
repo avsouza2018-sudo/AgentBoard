@@ -1,5 +1,17 @@
-import type { Workflow } from '@agentboard/domain';
+import type { LeaseStatus, Workflow } from '@agentboard/domain';
+import { leaseStatus } from '@agentboard/domain';
 import type { Task } from '@agentboard/domain';
+
+/**
+ * A lease as the read model reports it. `status` is the domain's word, not the page's: the same
+ * policy that refuses a `result` comment on an expired lease is what names `expiring` here, so the
+ * board and the page cannot disagree about the same card.
+ */
+export interface LeaseView {
+  agentId: string;
+  expiresAt: string;
+  status: LeaseStatus;
+}
 
 export interface TaskSummary {
   id: string;
@@ -11,7 +23,7 @@ export interface TaskSummary {
   assigneeId: string | null;
   labels: string[];
   blockedBy: string[];
-  lease: { agentId: string; expiresAt: string } | null;
+  lease: LeaseView | null;
   version: number;
   updatedAt: string;
 }
@@ -34,7 +46,7 @@ export interface ActivityDto {
   payload: Record<string, unknown>;
 }
 
-export function toTaskSummary(task: Task, workflow: Workflow): TaskSummary {
+export function toTaskSummary(task: Task, workflow: Workflow, now: Date): TaskSummary {
   const state = workflow.state(task.statusId);
   return {
     id: task.id,
@@ -46,7 +58,13 @@ export function toTaskSummary(task: Task, workflow: Workflow): TaskSummary {
     assigneeId: task.assigneeId,
     labels: task.labels,
     blockedBy: task.blockedBy,
-    lease: task.lease ? { agentId: task.lease.agentId, expiresAt: task.lease.expiresAt.toISOString() } : null,
+    lease: task.lease
+      ? {
+          agentId: task.lease.agentId,
+          expiresAt: task.lease.expiresAt.toISOString(),
+          status: leaseStatus(task.lease, now),
+        }
+      : null,
     version: task.version,
     updatedAt: task.updatedAt.toISOString(),
   };

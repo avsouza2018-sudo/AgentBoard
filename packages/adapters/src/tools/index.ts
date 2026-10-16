@@ -1,13 +1,26 @@
 import { z } from 'zod';
 import type { Application } from '@agentboard/application';
-import { createToolRegistry, type RouteSpec, type ToolAnnotations, type ToolDefinition, type ToolKind, type ToolRegistry } from '../toolRegistry.js';
+import {
+  createToolRegistry,
+  type RegistryOptions,
+  type RouteSpec,
+  type ToolAnnotations,
+  type ToolDefinition,
+  type ToolKind,
+  type ToolRegistry,
+} from '../toolRegistry.js';
 import { READ_TOOLS } from './readTools.js';
 import { WRITE_TOOLS } from './writeTools.js';
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [...READ_TOOLS, ...WRITE_TOOLS];
 
-export function buildToolRegistry(app: Application): ToolRegistry {
-  return createToolRegistry(app, TOOL_DEFINITIONS);
+/**
+ * The limiter and the sink are handed in, not invented here. A registry that picked its own limit
+ * would be a registry whose behaviour depends on which process loaded it, and the contract test would
+ * then be comparing a surface to a different surface.
+ */
+export function buildToolRegistry(app: Application, options: RegistryOptions = {}): ToolRegistry {
+  return createToolRegistry(app, TOOL_DEFINITIONS, options);
 }
 
 /**

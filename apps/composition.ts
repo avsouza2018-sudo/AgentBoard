@@ -6,10 +6,11 @@
  */
 import type { Deps } from '@agentboard/application';
 import type { OutboxReader } from '@agentboard/domain';
+import type { ActorLookup, LogSink, RateLimiter } from '@agentboard/adapters';
 import { id, type ActorId } from '@agentboard/shared';
+import { createTokenBucket, jsonLineSink } from '@agentboard/adapters';
 import {
   createPool,
-  FixedClock,
   InMemoryActivityRepository,
   InMemoryActorStore,
   InMemoryBoardRepository,
@@ -40,6 +41,22 @@ import {
 export interface Wiring {
   readonly deps: Deps;
   readonly outbox: OutboxReader;
+  /** Where a call is recorded. A deployment fact, so it is chosen here and nowhere below. */
+  readonly log: LogSink;
+  /** Traffic policy per credential. The domain has no concept of frequency, so it cannot own this. */
+  readonly limiter: RateLimiter;
+}
+
+const CAPACITY = Number(process.env.RATE_LIMIT_CAPACITY ?? 100);
+const REFILL_PER_SECOND = Number(process.env.RATE_LIMIT_REFILL_PER_SECOND ?? 10);
+
+/**
+ * The boundary that turns a credential into an actor id, once, so the log can name the actor without
+ * printing the credential. The use case still resolves through `Authorizer` for its own authorisation;
+ * this is not a second auth path, it is the same port answering a different question.
+ */
+export function actorLookup(deps: Deps): ActorLookup {
+  return async (token: string) => (await deps.resolver.resolve(token))?.id ?? null;
 }
 
 export async function memoryWiring(): Promise<Wiring> {
@@ -64,15 +81,22 @@ export async function memoryWiring(): Promise<Wiring> {
     ]),
   );
 
-  // Demo tokens are derived from the actor id, so `Bearer tok-agent-atlas` works.
-  await resolver.register({ id: id<ActorId>('agent-atlas'), type: 'agent', name: 'atlas', scopes: ['read', 'write', 'transition', 'comment'] });
-  await resolver.register({ id: id<ActorId>('human-ada'), type: 'human', name: 'ada', scopes: ['read', 'write', 'transition', 'comment'] });
+  const uow = new MemoryUnitOfWork();
+
+  // Demo tokens are derived from the actor id, so `Bearer tok-agent-atlas` works. Ada is the seed row —
+  // the one credential nobody minted — and atlas's is attributed to her, so the panel can say who put
+  // the agent on the board.
+  const ada = { id: id<ActorId>('human-ada'), type: 'human', name: 'ada', scopes: ['read', 'write', 'transition', 'comment'] } as const;
+  const atlas = { id: id<ActorId>('agent-atlas'), type: 'agent', name: 'atlas', scopes: ['read', 'write', 'transition', 'comment'] } as const;
+
+  await uow.run((tx) => resolver.register(tx, ada, { actorId: null, runId: null }));
+  await uow.run((tx) => resolver.register(tx, atlas, { actorId: ada.id, runId: null }));
 
   const publisher = new InMemoryEventPublisher();
 
   return {
     deps: {
-      uow: new MemoryUnitOfWork(),
+      uow,
       tasks: new InMemoryTaskRepository(),
       boards,
       workflows,
@@ -81,10 +105,15 @@ export async function memoryWiring(): Promise<Wiring> {
       publisher,
       resolver,
       directory: resolver,
-      clock: new FixedClock(new Date()),
+      agents: resolver,
+      // A live clock, not the test double. A frozen clock made the demo's rate limit never refill and
+      // every log line carry the same timestamp: time is not decoration once a policy reads it.
+      clock: { now: () => new Date() },
       ids: new SequentialIds(),
     },
     outbox: publisher,
+    log: jsonLineSink(process.stderr),
+    limiter: createTokenBucket({ capacity: CAPACITY, refillPerSecond: REFILL_PER_SECOND }),
   };
 }
 
@@ -104,10 +133,13 @@ export function postgresWiring(pool: ReturnType<typeof createPool>): Wiring {
       publisher,
       resolver: store,
       directory: store,
+      agents: store,
       clock: { now: () => new Date() },
       ids: { next: () => crypto.randomUUID() },
     },
     outbox: publisher,
+    log: jsonLineSink(process.stderr),
+    limiter: createTokenBucket({ capacity: CAPACITY, refillPerSecond: REFILL_PER_SECOND }),
   };
 }
 

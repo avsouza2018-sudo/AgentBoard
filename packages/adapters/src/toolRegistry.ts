@@ -1,9 +1,12 @@
 import { z } from 'zod';
 import type { Application } from '@agentboard/application';
+import type { Clock } from '@agentboard/domain';
 import type { AppError, Result } from '@agentboard/shared';
-import { ValidationError } from '@agentboard/shared';
+import { err, RateLimitedError, ValidationError } from '@agentboard/shared';
+import type { LogSink } from './logging.js';
+import type { RateLimiter } from './rateLimit.js';
 import type { ToolContext } from './toolContext.js';
-import { outcomeOf, toToolError, type ToolOutcome } from './toolOutcome.js';
+import { outcomeOf, type ToolOutcome } from './toolOutcome.js';
 
 export type ToolKind = 'read' | 'write';
 
@@ -76,8 +79,17 @@ export function defineTool<S extends z.ZodTypeAny>(
 export interface ToolRegistry {
   readonly tools: readonly ToolDefinition[];
   find(name: string): ToolDefinition | undefined;
-  /** Parse, then prove provenance, then call exactly one use case. */
+  /** Rate limit, parse, prove provenance, then call exactly one use case. */
   execute(ctx: ToolContext, name: string, rawArgs: unknown): Promise<ToolOutcome>;
+}
+
+export interface RegistryOptions {
+  /** Refused before any use case runs. A limit that runs the use case and then complains is not a limit. */
+  readonly limiter?: RateLimiter;
+  /** One entry per call, whatever the outcome. A log that only records successes cannot answer what went wrong. */
+  readonly log?: LogSink;
+  /** Injected so a test can read a timestamp without waiting for one. */
+  readonly clock?: Clock;
 }
 
 /**
@@ -93,43 +105,69 @@ function requireProvenance(tool: ToolDefinition, ctx: ToolContext): Result<unkno
   return { ok: true, value: undefined };
 }
 
-export function createToolRegistry(app: Application, tools: readonly ToolDefinition[]): ToolRegistry {
+export function createToolRegistry(
+  app: Application,
+  tools: readonly ToolDefinition[],
+  options: RegistryOptions = {},
+): ToolRegistry {
+  const clock = options.clock ?? { now: () => new Date() };
   const byName = new Map<string, ToolDefinition>();
   for (const tool of tools) {
     if (byName.has(tool.name)) throw new Error(`duplicate tool name: ${tool.name}`);
     byName.set(tool.name, tool);
   }
 
+  async function run(tool: ToolDefinition, ctx: ToolContext, rawArgs: unknown): Promise<ToolOutcome> {
+    const decision = options.limiter?.check(ctx.actorToken);
+    if (decision && !decision.allowed) {
+      return outcomeOf(err(new RateLimitedError(decision.retryAfterSeconds)));
+    }
+
+    const parsed = tool.inputSchema.safeParse(rawArgs ?? {});
+    if (!parsed.success) {
+      return outcomeOf({
+        ok: false,
+        error: new ValidationError(`invalid arguments for '${tool.name}'`, {
+          tool: tool.name,
+          issues: parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
+        }),
+      });
+    }
+
+    const provenance = requireProvenance(tool, ctx);
+    if (!provenance.ok) return outcomeOf(provenance);
+
+    return outcomeOf(await tool.execute(app, ctx, parsed.data));
+  }
+
   return {
     tools,
     find: (name) => byName.get(name),
     async execute(ctx, name, rawArgs): Promise<ToolOutcome> {
+      const startedAt = clock.now();
       const tool = byName.get(name);
-      if (!tool) {
-        return outcomeOf({
-          ok: false,
-          error: new ValidationError(`unknown tool '${name}'`, {
-            tool: name,
-            known: tools.map((t) => t.name),
-          }),
-        });
-      }
 
-      const parsed = tool.inputSchema.safeParse(rawArgs ?? {});
-      if (!parsed.success) {
-        return outcomeOf({
-          ok: false,
-          error: new ValidationError(`invalid arguments for '${name}'`, {
-            tool: name,
-            issues: parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
-          }),
-        });
-      }
+      const outcome = tool
+        ? await run(tool, ctx, rawArgs)
+        : outcomeOf(err(new ValidationError(`unknown tool '${name}'`, { tool: name, known: tools.map((t) => t.name) })));
 
-      const provenance = requireProvenance(tool, ctx);
-      if (!provenance.ok) return outcomeOf(provenance);
+      options.log?.write({
+        at: clock.now().toISOString(),
+        level: outcome.ok ? 'info' : 'warn',
+        event: 'tool_call',
+        transport: ctx.transport ?? 'unknown',
+        actorId: ctx.actorId ?? null,
+        runId: ctx.runId,
+        tool: name,
+        kind: tool?.kind ?? null,
+        route: tool?.route?.path ?? null,
+        outcome: outcome.ok ? 'ok' : 'refusal',
+        code: outcome.ok ? null : outcome.error.code,
+        durationMs: clock.now().getTime() - startedAt.getTime(),
+        limited: !outcome.ok && outcome.error.code === 'rate_limited',
+      });
 
-      return outcomeOf(await tool.execute(app, ctx, parsed.data));
+      return outcome;
     },
   };
 }

@@ -2,6 +2,8 @@ export * from './toolContext.js';
 export * from './toolOutcome.js';
 export * from './toolRegistry.js';
 export * from './errorMapping.js';
+export * from './rateLimit.js';
+export * from './logging.js';
 export * from './tools/index.js';
 export * from './mcp/protocol.js';
 export * from './mcp/stdio.js';

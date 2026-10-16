@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ApiClient } from '../api';
 import type { BoardStore, BoardView, CardView } from '../store';
 import { Columns } from './columns';
+import { Fleet } from './fleet';
 import { Panel } from './panel';
 import { useBoardView } from './useBoardView';
 
@@ -46,6 +47,10 @@ export function App({
           </span>
         </div>
       </header>
+
+      {/* The roster sits between the board and the identity because it is neither: it is who the server
+         says is on the board, and the page renders the answer it was given. */}
+      <Fleet view={view} onOpen={setOpen} />
 
       <main className="board">
         <Columns view={view} onOpen={setOpen} onMove={(taskId, stateId) => void store.move(taskId, stateId, 'moved on the board')} />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { id, type ActorId, type BoardId, type StateId, type TaskId } from '@agentboard/shared';
-import { Task, Workflow, canComment, evaluateTransition, type Role, type TransitionContext } from '@agentboard/domain';
+import { Task, Workflow, canComment, canRegisterPrincipal, evaluateTransition, leaseStatus, type Role, type TransitionContext } from '@agentboard/domain';
 
 const BOARD = id<BoardId>('b1');
 const AGENT = id<ActorId>('agent-atlas');
@@ -171,5 +171,66 @@ describe('comment policy', () => {
     const decision = canComment(expired, agent, 'note', now);
     expect(decision.ok).toBe(false);
     if (!decision.ok) expect(decision.error.code).toBe('lease_expired');
+  });
+});
+
+describe('registry policy', () => {
+  it('allows only a board admin to mint a credential', () => {
+    const decision = canRegisterPrincipal(human, 'admin');
+    expect(decision.ok).toBe(true);
+  });
+
+  it('refuses the fleet creating its own members', () => {
+    // The point is not that agents are weaker than admins. It is that an agent's board role is
+    // `agent`, so a runaway process cannot grant itself a second identity and then move a card
+    // under it.
+    const decision = canRegisterPrincipal(agent, 'agent');
+    expect(decision.ok).toBe(false);
+    if (!decision.ok) {
+      expect(decision.error.code).toBe('permission');
+      expect(decision.error.details.required).toBe('admin');
+      expect(decision.error.details.actorId).toBe(AGENT);
+    }
+  });
+
+  it('refuses a caller who is not on the board at all', () => {
+    const decision = canRegisterPrincipal(agent, null);
+    expect(decision.ok).toBe(false);
+    if (!decision.ok) expect(decision.error.message).toContain("'none'");
+  });
+});
+
+describe('lease status', () => {
+  const lease = (expiresAt: Date) => ({
+    taskId: id<TaskId>('t1'),
+    agentId: AGENT,
+    acquiredAt: new Date('2026-10-15T12:00:00.000Z'),
+    expiresAt,
+    renewCount: 0,
+  });
+
+  const now = new Date('2026-10-15T12:05:00.000Z');
+
+  it('names a lease with no claim as none', () => {
+    expect(leaseStatus(null, now)).toBe('none');
+  });
+
+  it('names a lease far from expiry as held', () => {
+    expect(leaseStatus(lease(new Date('2026-10-15T13:00:00.000Z')), now)).toBe('held');
+  });
+
+  it('names the same lease expiring inside the window the domain already owns', () => {
+    const edge = new Date(now.getTime() + 2 * 60 * 1000);
+    expect(leaseStatus(lease(new Date(edge.getTime() - 1)), now)).toBe('expiring');
+    expect(leaseStatus(lease(edge), now)).toBe('expiring');
+    expect(leaseStatus(lease(new Date(edge.getTime() + 1)), now)).toBe('held');
+  });
+
+  it('agrees with the guard that refuses a result comment on an expired lease', () => {
+    // The status is not a display preference: it is the same fact the guard uses, named one step
+    // earlier. If these two disagreed, the page would show a lease the domain was refusing.
+    const expired = task({ lease: lease(new Date('2026-10-15T11:30:00.000Z')) });
+    expect(leaseStatus(expired.lease, now)).toBe('expired');
+    expect(canComment(expired, agent, 'result', now).ok).toBe(false);
   });
 });

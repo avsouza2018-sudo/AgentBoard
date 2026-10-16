@@ -33,7 +33,7 @@ export function createMcpServer(registry: ToolRegistry, resolveContext: ContextR
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-    const ctx = resolveContext({ sessionId: extra.sessionId });
+    const ctx = await resolveContext({ sessionId: extra.sessionId });
     if (!ctx) {
       return renderMcp({
         ok: false,

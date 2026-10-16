@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import { err, id, type BoardId, PermissionError } from '@agentboard/shared';
 import type { Application } from '@agentboard/application';
-import type { ToolContext } from '../toolContext.js';
+import { withTransport, type ToolContext } from '../toolContext.js';
 import type { ToolRegistry } from '../toolRegistry.js';
 import { renderHttp, type HttpResponse } from '../errorMapping.js';
 import { outcomeOf } from '../toolOutcome.js';
@@ -24,7 +24,7 @@ export interface ApiOptions {
   /** Fed by the outbox port, not by a hook inside the use cases. */
   readonly stream: OutboxStream;
   /** Turns a token into an identity. The same `ActorResolver` the tools use. */
-  readonly resolve: (request: ApiRequest) => ToolContext | null;
+  readonly resolve: (request: ApiRequest) => ToolContext | null | Promise<ToolContext | null>;
 }
 
 export interface ApiServer {
@@ -130,7 +130,7 @@ async function handleEvents(
     body: undefined,
   };
 
-  const ctx = deps.resolve(request);
+  const ctx = withTransport(await deps.resolve(request), 'http');
   if (!ctx) {
     const denied = outcomeOf(err(new PermissionError('a bearer token is required', { path: request.path })));
     writeRendered(res, renderHttp(denied));

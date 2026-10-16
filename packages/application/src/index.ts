@@ -14,11 +14,13 @@ import { AssignTask } from './commands/assignTask.js';
 import { SetBlockedBy } from './commands/setBlockedBy.js';
 import { UpdateTask } from './commands/updateTask.js';
 import { Escalate } from './commands/escalate.js';
+import { RegisterAgent } from './commands/registerAgent.js';
 
 import { GetBoardSnapshot } from './queries/getBoardSnapshot.js';
 import { GetTask } from './queries/getTask.js';
 import { GetActivity } from './queries/getActivity.js';
 import { ListTasks } from './queries/listTasks.js';
+import { ListAgents } from './queries/listAgents.js';
 import { WhoAmI } from './queries/whoAmI.js';
 
 /**
@@ -42,12 +44,14 @@ export function buildApplication(deps: Deps) {
     assignTask: new AssignTask(deps, authorizer, recorder),
     setBlockedBy: new SetBlockedBy(deps, authorizer, recorder),
     escalate: new Escalate(deps, authorizer, recorder),
+    registerAgent: new RegisterAgent(deps, authorizer),
 
     whoAmI: new WhoAmI(deps, authorizer),
     getBoardSnapshot: new GetBoardSnapshot(deps, authorizer),
     getTask: new GetTask(deps, authorizer),
     getActivity: new GetActivity(deps, authorizer),
     listTasks: new ListTasks(deps, authorizer),
+    listAgents: new ListAgents(deps, authorizer),
   };
 }
 
@@ -65,10 +69,12 @@ export * from './commands/assignTask.js';
 export * from './commands/setBlockedBy.js';
 export * from './commands/updateTask.js';
 export * from './commands/escalate.js';
+export * from './commands/registerAgent.js';
 export * from './queries/getBoardSnapshot.js';
 export * from './queries/getTask.js';
 export * from './queries/getActivity.js';
 export * from './queries/listTasks.js';
+export * from './queries/listAgents.js';
 export * from './queries/whoAmI.js';
 export * from './queries/map.js';
 export * from './services/authorizer.js';

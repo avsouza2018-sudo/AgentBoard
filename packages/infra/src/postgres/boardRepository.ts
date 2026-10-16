@@ -32,6 +32,29 @@ export class PgBoardRepository implements BoardRepository {
       }),
     );
   }
+
+  /**
+   * The roster is decided by the aggregate, so this writes what the aggregate decided instead of
+   * deciding it. A grant and a role change are the same statement here because they are the same act
+   * in the domain.
+   */
+  async save(tx: Tx, board: Board): Promise<void> {
+    const client = clientOf(tx);
+
+    await client.query(
+      `insert into boards (id, name, slug, workflow_id) values ($1, $2, $3, $4)
+       on conflict (id) do update set name = excluded.name, slug = excluded.slug, workflow_id = excluded.workflow_id`,
+      [board.id, board.name, board.slug, board.workflowId],
+    );
+
+    for (const membership of board.members) {
+      await client.query(
+        `insert into board_members (board_id, actor_id, role) values ($1, $2, $3)
+         on conflict (board_id, actor_id) do update set role = excluded.role`,
+        [board.id, membership.actorId, membership.role],
+      );
+    }
+  }
 }
 
 export class PgWorkflowRepository implements WorkflowRepository {

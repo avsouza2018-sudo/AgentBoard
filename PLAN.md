@@ -312,7 +312,7 @@ Definition of done for the architecture: `pnpm dep-check` fails if `packages/dom
 | **M4** | MCP server ✅ | stdio + HTTP transports, full tool surface, error-code parity with HTTP; agent can claim → move → comment end-to-end |
 | **M5** | HTTP API + auth ✅ | routes generated from the tool registry, token auth, actor resolution, error mapping, SSE from the outbox, OpenAPI from the same definitions |
 | **M6** | React board ✅ | columns, card move, drawer, activity, live updates, optimistic rollback |
-| **M7** | Agent panel + hardening | agent registry, lease indicators, rate limit, structured logging, OpenAPI, README with example agent session |
+| **M7** | Agent panel + hardening ✅ | agent registry (who minted this credential), `canRegisterPrincipal`, lease status as a domain word, per-token rate limit in an adapter, structured logging, fleet strip on the page, README example agent session |
 
 ---
 
@@ -337,9 +337,9 @@ Definition of done for the architecture: `pnpm dep-check` fails if `packages/dom
 
 ---
 
-## 13. Build status — M0, M1, M2, M3, M4, M5, M6 complete
+## 13. Build status — M0, M1, M2, M3, M4, M5, M6, M7 complete
 
-`pnpm typecheck` clean (both tsconfigs), 90 tests green, `pnpm dep-check` exit 0 (109 modules, 223 dependencies).
+`pnpm typecheck` clean (both tsconfigs), 120 tests green, `pnpm dep-check` exit 0 (117 modules, 243 dependencies).
 
 | Milestone | State |
 |---|---|
@@ -350,6 +350,7 @@ Definition of done for the architecture: `pnpm dep-check` fails if `packages/dom
 | M4 MCP server | done — transport-neutral tool registry (15 tools, one per use case), JSON-schema contract snapshot, stdio + stateless streamable-HTTP transports, error-code parity, 21 tests including a real child-process stdio run |
 | M5 HTTP API | done — routes generated from the tool definitions, token auth through the same `ActorResolver`, error mapping through the same table, SSE fed by the outbox, OpenAPI generated from the same definitions; 17 tests (9 REST, 4 SSE, 4 OpenAPI) |
 | M6 React board | done — the page is a client of the HTTP contract: hand-written mirror shapes checked against a live server, an optimistic store whose rollback re-reads the server, a live feed fed by the outbox, columns + card + drawer + activity; 12 tests (6 board, 6 client) |
+| M7 agent panel + hardening | done — registry port + `canRegisterPrincipal` (the fleet cannot mint a credential), attribution stored on the credential row, `Board.grant` + `save`, lease status as a domain word reported by the read model, per-token token bucket in the shared registry (refused before the use case runs, 429 + `retry-after`, same words over both doors), one structured log entry per call that names the actor and never the credential, fleet strip on the page, README example agent session; 30 new tests (7 policy, 6 registry, 5 rate limit, 6 logging, 6 web agents) plus refreshed assertions in the contract, client, stdio and migration tests — 120 in total |
 
 ### What M0–M2 forced
 
@@ -547,3 +548,63 @@ is, not where the page thought it was. That is the only test that can tell an op
 lying one. `tests/web/client.test.ts` is the pair: it checks every operation the client calls against
 the generated OpenAPI document, and compares the field lists the client expects against the JSON a live
 server sends. A page that invents a route or drifts from the response shape is caught there.
+
+### What M7 forced
+
+1. **The fleet cannot create its own members.** `canRegisterPrincipal` is a pure policy: only a board
+   admin may mint a credential, and the refusal names the role it needs. A registry that lets an agent
+   register itself is not a registry — it is an open door, and every audit row after it has no author.
+   An agent with write scope could otherwise mint a second agent with a broader role, and the trail would
+   show a card moved by someone who was granted nothing.
+2. **The domain must not know what a credential looks like.** `ActorRegistry` returns an opaque handle:
+   the memory adapter mints `tok-<actorId>` so the demo board is reproducible, Postgres mints a uuid. A
+   rule written against either format would pass in a test and fail in production — so the harness seeds
+   its fixture tokens directly instead of calling the port.
+3. **Attribution lives on the credential row, not in the audit log.** `ActivityEvent.taskId` is required:
+   the audit trail is aggregate-scoped, so a board-level registration cannot be appended to it. The token
+   row carries `created_by`, `run_id`, `registered_at`, and `registeredBy` is `null` for exactly one row —
+   the seed, the credential nobody minted. If `null` could also mean "not recorded", the trail stops being
+   readable.
+4. **Membership is aggregate behaviour.** `Board.grant` + `BoardRepository.save`. A rule that lives in a
+   repository is a rule the read path can bypass.
+5. **The log names the actor, never the credential.** A token is an input and a secret; putting it in a log
+   line puts the proof of identity somewhere it is copied, retained, and read by people who were not the
+   caller. `actorId` answers the same question without carrying the thing that proves it. The resolver is
+   called once at the boundary for the log, and again by the use case through `Authorizer` — same port,
+   two questions.
+6. **Exactly one entry per call, whatever the outcome**, produced by the registry both transports share.
+   A log that only records successes cannot answer what went wrong, and the refused call is the one a
+   reader is looking for — so the rate limit writes its own record, with `limited: true`, before anything
+   ran. The `route` in the entry comes from the tool definition, not from the request: the same reason
+   OpenAPI is generated rather than written beside the routes.
+7. **A limit that runs the use case and then complains is not a limit.** The limiter sits at the front of
+   the shared registry, ahead of parsing, so both doors answer with the same taxonomy the renderers
+   already own (`rate_limited` → 429 + `retry-after`). It is keyed by **credential**, not by actor: two
+   tokens for the same actor are two clients, and merging them lets one runaway process spend the other's
+   budget.
+8. **Lease status is the domain's word, not the page's.** `leaseStatus` is a policy function and the read
+   model reports it; `EXPIRING_WINDOW_MS` is the same fact the guard already uses one step later, when it
+   refuses a `result` comment on an expired lease. The aggregate's wire shape carries no status, because
+   status is a fact about the moment of a read — which is why the client test asserts its absence, and why
+   the page renders a word instead of computing staleness.
+9. **The transport has to say which door it came through** (`withTransport`), so one log shape serves
+   stdio, MCP over HTTP, and REST. Without it the same tool call is recorded as if it had no origin.
+10. **A demo root needs a live clock.** The injected clock is what makes a timestamp readable in a test,
+    but the frozen clock in the composition root made the bucket never refill and every log line carry the
+    same `at`. A rate limiter and a log are both facts about time: the wiring that runs the board needs the
+    real one, the tests keep the injected one.
+11. **A read model must not hand out the domain's own array.** `exactOptionalPropertyTypes` caught
+    `AgentView.scopes` being passed by reference; the view copies, because a caller that mutates a view can
+    reach into the aggregate.
+
+### The test that matters most in M7
+
+`tests/adapters/ratelimit.test.ts` — it refuses the call that spends the budget *before the use case runs*,
+which is only provable because the fake application records whether it was reached; then it shows the same
+refusal arrives as `429` + `retry-after` over a route and as `isError` + `code: 'rate_limited'` over the
+protocol, refills, and stays keyed by credential. `tests/domain/policy.test.ts` is the pair: it refuses the
+fleet minting its own members, and it makes the lease-status window agree with the guard that refuses a
+result comment on an expired lease — the same lease, the same word, two places that cannot disagree.
+`tests/adapters/logging.test.ts` proves the sink never contains the token, and `tests/web/agents.test.ts`
+proves the page does not decide staleness: the server clock advances, and the card still shows the word the
+server said.

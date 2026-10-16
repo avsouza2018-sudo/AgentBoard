@@ -1,5 +1,6 @@
 import type { ApiClient } from './api.js';
 import type {
+  AgentView,
   ApiError,
   BoardSnapshot,
   ColumnSnapshot,
@@ -42,6 +43,8 @@ export interface BoardView {
   board: BoardSnapshot['board'] | null;
   workflow: BoardSnapshot['workflow'] | null;
   columns: ColumnView[];
+  /** The roster exactly as the server answered it. The page does not decide who is holding anything. */
+  agents: AgentView[];
   feed: FeedItem[];
   pending: number;
   connected: boolean;
@@ -65,6 +68,7 @@ export interface BoardView {
  */
 export class BoardStore {
   private snapshot: BoardSnapshot | null = null;
+  private roster: AgentView[] = [];
   private readonly pending = new Map<string, PendingMove>();
   private readonly refusals = new Map<string, ApiError>();
   private feed: FeedItem[] = [];
@@ -114,15 +118,25 @@ export class BoardStore {
       board: snapshot?.board ?? null,
       workflow: snapshot?.workflow ?? null,
       columns,
+      agents: this.roster,
       feed: this.feed,
       pending: this.pending.size,
       connected: this.connected,
     };
   }
 
+  /**
+   * The board and the roster are two reads. The roster is not part of the snapshot: it is who the
+   * server says is on the board and what each of them is holding at the instant it answered. Keeping
+   * them separate is what makes "re-read" the only way a status changes on this page.
+   */
   async load(): Promise<Outcome<BoardSnapshot>> {
     const outcome = await this.api.board(this.boardId);
     if (outcome.ok) this.snapshot = outcome.data;
+
+    const roster = await this.api.agents(this.boardId);
+    if (roster.ok) this.roster = roster.data;
+
     this.emit();
     return outcome;
   }
@@ -218,7 +232,10 @@ export class BoardStore {
     card.blockedBy = aggregate.blockedBy;
     card.version = aggregate.version;
     card.updatedAt = aggregate.updatedAt;
-    card.lease = aggregate.lease ? { agentId: aggregate.lease.agentId, expiresAt: aggregate.lease.expiresAt } : null;
+    // A write response carries the aggregate, and an aggregate carries a lease but no status — a status
+    // is a fact about the moment a read happened. So the page keeps the lease it was given and shows no
+    // word for staleness until the next read. Inventing one here would be the second definition.
+    card.lease = aggregate.lease ? { agentId: aggregate.lease.agentId, expiresAt: aggregate.lease.expiresAt, status: null } : null;
   }
 
   private async reload(): Promise<void> {
